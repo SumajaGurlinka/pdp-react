@@ -1,0 +1,59 @@
+# .gitlab-ci.yml
+
+# Define stages for the pipeline
+stages:
+  # - connect_vm    # Connect to VM machine
+  # - pull          # Pull the data from Gitlab server
+  # - build         # Build Production build
+  # # - build_dev   # Build Developement build
+  # # - test          # Test
+  # - deploy        # Deploy
+
+connect_vm:
+  stage: connect_vm
+  script:
+    - echo "Connecting to Virtual Machine...."
+    # Use sshpass to provide the password for the SSH connection
+    - export SSHPASS="seneca123$"
+    # Establish SSH connection and execute a command to verify the connection
+    - sshpass -e ssh user@your-linux-vm || exit 1
+    - echo "Connected to VM successfully!."
+  only:
+    - develop
+
+pull:
+  stage: pull
+  script:
+    - echo "Pulling the latest changes from the Gitlab server..."
+    - sshpass -e ssh -T -o StrictHostKeyChecking=no seneca@192.168.1.54 "cd ~/pdp/pdp-ui/"
+    - sshpass -e ssh -T -o StrictHostKeyChecking=no seneca@192.168.1.54 "git checkout develop"
+    - sshpass -e ssh -T -o StrictHostKeyChecking=no seneca@192.168.1.54 "git pull origin develop"
+    - echo "Code pull from Gitlab is done."
+  only:
+    - develop
+
+build:
+  stage: build
+  script:
+    - echo "Building Production build..."
+    # Reuse the SSH connection established in the previous job
+    - sshpass -e ssh -T -o StrictHostKeyChecking=no seneca@192.168.1.54 "cd ~/pdp/pdp-ui/"
+    - sshpass -e ssh -T -o StrictHostKeyChecking=no seneca@192.168.1.54 "npm install"
+    - sshpass -e ssh -T -o StrictHostKeyChecking=no seneca@192.168.1.54 "npm run build:prod"
+    - echo "Production build generated."
+  only:
+    - develop
+
+deploy:
+  stage: deploy
+  script:
+    - echo "Deployment Started..."
+    # Reuse the SSH connection established in the previous job
+    - sshpass -e ssh -T -o StrictHostKeyChecking=no seneca@192.168.1.54 "cd ~/pdp/pdp-ui/"
+    - sshpass -e ssh -T -o StrictHostKeyChecking=no seneca@192.168.1.54 "sudo rm -rf /var/www/html/*"
+    - sshpass -e ssh -T -o StrictHostKeyChecking=no seneca@192.168.1.54 "sudo mv dist/* /var/www/html/"
+    - echo "Build deployed"
+    - sshpass -e ssh -T -o StrictHostKeyChecking=no seneca@192.168.1.54 "sudo systemctl restart nginx"
+    - echo "NgINX server restarted..."
+  only:
+    - develop
